@@ -30,8 +30,8 @@ export default function RevenueStats() {
   }, []);
 
   return (
-    <div className="bg-gradient-to-br from-blue-900 to-indigo-900 text-white p-6 rounded-2xl mt-8">
-      <h2 className="text-2xl font-semibold mb-4">📊 Doanh thu tháng này</h2>
+    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-6 rounded-2xl mt-8">
+      <h2 className="text-2xl font-semibold mb-4">Doanh thu tháng này</h2>
       <p className="text-lg mb-4">
         Tổng doanh thu: <b>{parseFloat(total).toPrecision(6)} ETH</b>
       </p>

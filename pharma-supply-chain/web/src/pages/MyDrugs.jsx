@@ -49,9 +49,9 @@ export default function MyDrugs() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-100 to-indigo-50">
       <main className="p-6">
-        <h2 className="text-2xl font-bold mb-4">My Drugs</h2>
+        <h2 className="text-2xl font-bold mb-4 text-gray-800">My Drugs</h2>
         {drugs.length === 0 ? (
           <p>No drugs found.</p>
         ) : (

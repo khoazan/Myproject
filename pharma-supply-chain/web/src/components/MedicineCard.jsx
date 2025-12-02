@@ -2,16 +2,15 @@ import React from "react";
 import { Link } from "react-router-dom";
 
 export default function MedicineCard({ m, onNextStage, showNextStage = true, onEdit, onDelete }) {
-  const stages = ["Manufactured", "Distributed", "InPharmacy", "Sold"];
+  const stages = ["Manufactured", "Distributed", "InPharmacy", "Sold", "Cancelled"];
 
   const stageColors = [
     "bg-blue-100 text-blue-700",
     "bg-yellow-100 text-yellow-700",
     "bg-purple-100 text-purple-700",
     "bg-green-100 text-green-700",
+    "bg-red-100 text-red-700",
   ];
-
-  const stageEmoji = ["🏭", "🚚", "🏬", "👤"];
 
   const getImageSrc = () => {
     if (m.image) {
@@ -55,7 +54,6 @@ export default function MedicineCard({ m, onNextStage, showNextStage = true, onE
               stageColors[m.stage]
             }`}
           >
-            <span className="mr-2">{stageEmoji[m.stage]}</span>
             {stages[m.stage] ?? "Unknown"}
           </div>
         </div>

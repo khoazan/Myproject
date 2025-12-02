@@ -268,23 +268,48 @@ def health():
     return {"ok": True, "connected": w3.is_connected(), "network": w3.eth.chain_id}
 
 
+def build_drug_payload(include_cancelled: bool = False) -> List[Dict[str, Any]]:
+    """
+    Lấy danh sách thuốc từ smart contract.
+    Trả về: id, name, batch, owner, price (wei), stage.
+    """
+    result = contract.functions.getAllDrugs().call()
+    ids, names, batches, prices, stages, owners = result
+
+    payload: List[Dict[str, Any]] = []
+    for i in range(len(ids)):
+        stage = int(stages[i])
+        if not include_cancelled and stage == 4:
+            # 4 = Cancelled (theo design cũ)
+            continue
+
+        payload.append(
+            {
+                "id": int(ids[i]),
+                "name": names[i],
+                "batch": batches[i],
+                "owner": owners[i],
+                "price": int(prices[i]),
+                "stage": stage,
+            }
+        )
+    return payload
+
+
 @app.get("/drugs", response_model=List[Dict[str, Any]])
-def get_all_drugs(current_user: dict = Depends(get_current_user)):
+def get_all_drugs(current_user: dict = Depends(get_current_user), include_cancelled: bool = False):
+    """API nội bộ (cần đăng nhập) lấy danh sách thuốc từ blockchain."""
     try:
-        total = contract.functions.drugCount().call()
-        arr = []
-        for i in range(1, total + 1):
-            d = contract.functions.drugs(i).call()
-            arr.append(
-                {
-                    "id": d[0],
-                    "name": d[1],
-                    "batch": d[2],
-                    "owner": d[3],
-                    "stage": int(d[4]),
-                }
-            )
-        return arr
+        return build_drug_payload(include_cancelled)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/public/drugs", response_model=List[Dict[str, Any]])
+def get_public_drugs(include_cancelled: bool = False):
+    """API public cho cả admin FE và user FE lấy danh sách thuốc."""
+    try:
+        return build_drug_payload(include_cancelled)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -446,6 +471,42 @@ async def get_transactions():
     except Exception as e:
         print(f"Error getting transactions: {e}")
         return {"count": 0, "data": []}
+
+
+@app.get("/api/user-stats")
+def get_user_stats(current_user: dict = Depends(get_current_user)):
+    """
+    Thống kê người dùng dựa trên dữ liệu giao dịch:
+    - Tổng số đơn, tổng tiền đã mua
+    - Số giao dịch (coi như số lượng thuốc đơn giản)
+    - Lần mua gần nhất
+    """
+    try:
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$customer",
+                    "totalSpent": {"$sum": "$price_eth"},
+                    "orderCount": {"$sum": 1},
+                    "itemCount": {"$sum": 1},
+                    "lastPurchase": {"$max": "$timestamp"},
+                }
+            },
+            {"$sort": {"totalSpent": -1}},
+        ]
+        stats = list(transactions_collection.aggregate(pipeline))
+        for doc in stats:
+            doc["customer"] = doc.pop("_id", "unknown")
+            doc["totalSpent"] = float(doc.get("totalSpent", 0))
+            doc["avgOrderValue"] = (
+                doc["totalSpent"] / doc["orderCount"] if doc["orderCount"] else 0
+            )
+            last_purchase = doc.get("lastPurchase")
+            if isinstance(last_purchase, datetime):
+                doc["lastPurchase"] = last_purchase.isoformat()
+        return {"count": len(stats), "data": stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():

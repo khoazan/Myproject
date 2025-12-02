@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import ProductCard from "./ProductCard";
-import { getBlockchainContract } from "../../contracts/contract";
 import { ethers, formatEther } from "ethers";
 import { getBackendUrl } from "../utils/pricing";
 
@@ -10,26 +9,40 @@ const ProductSection = () => {
 
   useEffect(() => {
     const loadDrugs = async () => {
-      const contract = await getBlockchainContract();
-      if (!contract) return;
-
-      const data = await contract.getAllDrugs();
-      const [ids, names, batches, prices, stages, owners] = data;
-
-      const formatted = names.map((name, i) => ({
-        id: Number(ids[i]),
-        name,
-        batch: batches[i],
-        price: Number(formatEther(prices[i])),
-        stage: Number(stages[i]),
-        owner: owners[i],
-        description: `Batch: ${batches[i]} | Owner: ${owners[i].slice(
-          0,
-          6
-        )}...${owners[i].slice(-4)}`,
-      }));
-
-      setProducts(formatted);
+      try {
+        const backendUrl = getBackendUrl();
+        const res = await fetch(`${backendUrl}/public/drugs`);
+        if (!res.ok) {
+          throw new Error("Failed to fetch drugs from backend");
+        }
+        const data = await res.json();
+        const formatted = data
+          .filter((item) => item.stage !== 4)
+          .map((item) => {
+            const description = `Batch: ${item.batch} | Owner: ${item.owner.slice(
+              0,
+              6
+            )}...${item.owner.slice(-4)}`;
+            const normalizedImage = item.image
+              ? item.image.startsWith("http")
+                ? item.image
+                : `${backendUrl}${item.image}`
+              : null;
+            return {
+              id: Number(item.id),
+              name: item.name,
+              batch: item.batch,
+              price: Number(formatEther(item.price.toString())),
+              stage: Number(item.stage),
+              owner: item.owner,
+              imageUrl: normalizedImage,
+              description,
+            };
+          });
+        setProducts(formatted);
+      } catch (err) {
+        console.error("Failed to load drugs:", err);
+      }
     };
 
     loadDrugs();
@@ -49,7 +62,6 @@ const ProductSection = () => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const contract = await getBlockchainContract(signer);
 
       const tx = await signer.sendTransaction({
         to: "0xaBeDEfE118d9016Ba5Ff206E5a7D64ef37128fAB", // ví admin
