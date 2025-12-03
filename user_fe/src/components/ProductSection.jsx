@@ -67,19 +67,26 @@ const ProductSection = () => {
       const currentAccount = await signer.getAddress();
       const receiver = "0xaBeDEfE118d9016Ba5Ff206E5a7D64ef37128fAB"; // ví admin
       
-      // Kiểm tra: không cho phép gửi từ ví admin đến chính nó
-      if (currentAccount.toLowerCase() === receiver.toLowerCase()) {
-        alert("Không thể mua hàng bằng ví admin. Vui lòng dùng ví khác để mua hàng.");
-        return;
+      // Nếu ví người dùng = ví admin, không cần gửi transaction (vì đã là ví nhận rồi)
+      const isAdminWallet = currentAccount.toLowerCase() === receiver.toLowerCase();
+      let tx = null;
+      let receipt = null;
+      let txHash = null;
+
+      if (!isAdminWallet) {
+        // Gửi transaction bình thường nếu không phải ví admin
+        tx = await signer.sendTransaction({
+          to: receiver,
+          value: ethers.parseEther(product.price.toString()),
+        });
+        txHash = tx.hash;
+        receipt = await tx.wait();
+        console.log("✅ Transaction confirmed:", receipt);
+      } else {
+        // Nếu là ví admin, tạo fake tx hash để ghi nhận (không gửi transaction thật)
+        txHash = `0x${Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+        console.log("⚠️ Admin wallet detected - skipping transaction, recording purchase only");
       }
-
-      const tx = await signer.sendTransaction({
-        to: receiver,
-        value: ethers.parseEther(product.price.toString()),
-      });
-
-      const receipt = await tx.wait();
-      console.log("✅ Transaction confirmed:", receipt);
 
       // ⏰ Format timestamp giờ Việt Nam
       const vnTime = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString();
@@ -93,9 +100,9 @@ const ProductSection = () => {
           customer: account,
           medicine: [{ name: product.name, qty: 1 }],
           price_eth: product.price,
-          tx_hash: tx.hash,
-          chain_id: 11155111,
-          block_number: receipt.blockNumber,
+          tx_hash: txHash,
+          chain_id: isAdminWallet ? null : 11155111,
+          block_number: receipt?.blockNumber ?? null,
           timestamp: vnTime, // ✅ thêm dòng này
         }),
       });

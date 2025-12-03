@@ -47,24 +47,29 @@ const PaymentModal = ({ cartItems, totalPrice, onClose, onSuccess }) => {
     try {
       // Sử dụng cùng địa chỉ ví admin như mua trực tiếp
       const receiver = "0xaBeDEfE118d9016Ba5Ff206E5a7D64ef37128fAB";
-      
-      // Kiểm tra: không cho phép gửi từ ví admin đến chính nó
-      if (account && account.toLowerCase() === receiver.toLowerCase()) {
-        throw new Error('Không thể mua hàng bằng ví admin. Vui lòng dùng ví khác để mua hàng.');
-      }
-      
       const amountEth = ethAmount ?? Number((totalPrice * 0.0003).toFixed(6));
-      const valueWei = ethers.parseEther(amountEth.toFixed(6));
+      
+      // Nếu ví người dùng = ví admin, không cần gửi transaction (vì đã là ví nhận rồi)
+      const isAdminWallet = account && account.toLowerCase() === receiver.toLowerCase();
+      let tx = null;
+      let receipt = null;
+      let txHash = null;
 
-      const tx = await signer.sendTransaction({
-        to: receiver,
-        value: valueWei,
-        gasLimit: 21000,
-      });
-
-      setTxHash(tx.hash);
-      // Wait for transaction confirmation then record to backend
-      const receipt = await tx.wait();
+      if (!isAdminWallet) {
+        // Gửi transaction bình thường nếu không phải ví admin
+        const valueWei = ethers.parseEther(amountEth.toFixed(6));
+        tx = await signer.sendTransaction({
+          to: receiver,
+          value: valueWei,
+          gasLimit: 21000,
+        });
+        txHash = tx.hash;
+        receipt = await tx.wait();
+      } else {
+        // Nếu là ví admin, tạo fake tx hash để ghi nhận (không gửi transaction thật)
+        txHash = `0x${Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+        console.log('⚠️ Admin wallet detected - skipping transaction, recording purchase only');
+      }
 
       // Record purchase
       try {
@@ -73,8 +78,8 @@ const PaymentModal = ({ cartItems, totalPrice, onClose, onSuccess }) => {
           customer: account,
           medicine: cartItems.map(i => ({ id: i.id, name: i.name, qty: i.quantity, price_usd: i.price })),
           price_eth: amountEth,
-          tx_hash: tx.hash,
-          chain_id: chainId,
+          tx_hash: txHash,
+          chain_id: isAdminWallet ? null : chainId,
           block_number: receipt?.blockNumber ?? null,
         };
         console.log('📤 Sending purchase to backend:', `${backend}/api/purchase`, payload);
