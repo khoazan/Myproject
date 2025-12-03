@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiStar, FiShoppingCart, FiArrowLeft, FiCheck, FiPackage, FiShield, FiTruck } from 'react-icons/fi';
+import { formatEther } from 'ethers';
 import Navbar from '../components/Navbar';
 import Cart from '../components/Cart';
 import { useCart } from '../contexts/CartContext';
@@ -34,11 +35,29 @@ const ProductDetail = () => {
           // Find product by id
           const index = ids.findIndex(drugId => Number(drugId) === parseInt(id));
           if (index !== -1) {
+            // Try to get image from backend
+            let imageUrl = null;
+            try {
+              const backendUrl = getBackendUrl();
+              const backendRes = await fetch(`${backendUrl}/public/drugs`);
+              if (backendRes.ok) {
+                const backendData = await backendRes.json();
+                const backendItem = backendData.find(item => Number(item.id) === parseInt(id));
+                if (backendItem?.image) {
+                  imageUrl = backendItem.image.startsWith("http")
+                    ? backendItem.image
+                    : `${backendUrl}${backendItem.image}`;
+                }
+              }
+            } catch (e) {
+              console.debug('Could not fetch image from backend');
+            }
+            
             setProduct({
               id: Number(ids[index]),
               name: names[index],
               price: Number(formatEther(prices[index])),
-              imageUrl: "/api/placeholder/300/200",
+              imageUrl: imageUrl,
               rating: 4.5,
               description: `Batch ${batches[index]}`,
               batch: batches[index],
@@ -50,6 +69,7 @@ const ProductDetail = () => {
               manufacturer: "Blockchain Verified",
               expiryDate: "N/A",
               stock: 999,
+              stage: Number(stages[index]),
             });
             setLoading(false);
             return;
@@ -60,29 +80,39 @@ const ProductDetail = () => {
       }
 
       try {
-        // Try backend
-        const res = await fetch(`${getBackendUrl()}/api/drugs/${id}`);
+        // Try backend - fetch from /public/drugs like ProductSection
+        const backendUrl = getBackendUrl();
+        const res = await fetch(`${backendUrl}/public/drugs`);
         if (res.ok) {
           const data = await res.json();
-          setProduct({
-            id: data.id,
-            name: data.name,
-            price: 0,
-            imageUrl: "/api/placeholder/300/200",
-            rating: 4.5,
-            description: data.description || `Batch ${data.batch}`,
-            batch: data.batch,
-            owner: data.owner,
-            fullDescription: data.description || "No detailed description available.",
-            ingredients: "N/A",
-            dosage: "Consult healthcare provider",
-            warnings: "Consult healthcare provider before use",
-            manufacturer: "N/A",
-            expiryDate: "N/A",
-            stock: data.quantity || 0,
-          });
-          setLoading(false);
-          return;
+          const foundItem = data.find(item => Number(item.id) === parseInt(id));
+          if (foundItem) {
+            const normalizedImage = foundItem.image
+              ? foundItem.image.startsWith("http")
+                ? foundItem.image
+                : `${backendUrl}${foundItem.image}`
+              : null;
+            setProduct({
+              id: Number(foundItem.id),
+              name: foundItem.name,
+              price: Number(formatEther(foundItem.price.toString())),
+              imageUrl: normalizedImage,
+              rating: 4.5,
+              description: `Batch ${foundItem.batch}`,
+              batch: foundItem.batch,
+              owner: foundItem.owner,
+              fullDescription: `Sản phẩm từ blockchain với batch ${foundItem.batch}. Owner: ${foundItem.owner}`,
+              ingredients: "N/A",
+              dosage: "Consult healthcare provider",
+              warnings: "Consult healthcare provider before use",
+              manufacturer: "Blockchain Verified",
+              expiryDate: "N/A",
+              stock: 999,
+              stage: Number(foundItem.stage),
+            });
+            setLoading(false);
+            return;
+          }
         }
       } catch (error) {
         console.debug('Backend not available, using sample data');
@@ -172,7 +202,19 @@ const ProductDetail = () => {
             {/* Left Column - Image */}
             <div className="space-y-4">
               <div className="relative h-96 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl overflow-hidden flex items-center justify-center">
-                <div className="w-48 h-48 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl">
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.parentElement.querySelector('.fallback-icon');
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div className={`fallback-icon w-48 h-48 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl ${product.imageUrl ? 'hidden' : 'flex'}`}>
                   <svg className="w-24 h-24 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                   </svg>
@@ -207,17 +249,13 @@ const ProductDetail = () => {
                     <span className="font-semibold text-gray-900">{product.batch}</span>
                   </div>
                   {product.owner && (
-                    <div className="flex justify-between items-center py-2 border-b border-blue-100">
+                    <div className="flex justify-between items-center py-2">
                       <span className="text-gray-600">Owner:</span>
                       <span className="font-mono text-sm bg-white px-3 py-1 rounded-lg text-gray-700 border border-gray-200">
                         {product.owner.slice(0, 6)}...{product.owner.slice(-4)}
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-600">Số lượng còn:</span>
-                    <span className="font-semibold text-green-600">{product.stock} đơn vị</span>
-                  </div>
                 </div>
               </div>
 
