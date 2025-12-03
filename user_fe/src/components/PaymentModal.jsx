@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { FiX, FiLoader, FiCheckCircle, FiAlertCircle, FiExternalLink } from 'react-icons/fi';
 import { useWeb3 } from '../contexts/Web3Context';
 import { ethers } from 'ethers';
-import { convertUsdToEth, getReceiverAddress, getBackendUrl } from '../utils/pricing';
+import { convertUsdToEth, getBackendUrl } from '../utils/pricing';
 
 const PaymentModal = ({ cartItems, totalPrice, onClose, onSuccess }) => {
   const { signer, account, chainId } = useWeb3();
@@ -45,7 +45,14 @@ const PaymentModal = ({ cartItems, totalPrice, onClose, onSuccess }) => {
     setError(null);
 
     try {
-      const receiver = getReceiverAddress();
+      // Sử dụng cùng địa chỉ ví admin như mua trực tiếp
+      const receiver = "0xaBeDEfE118d9016Ba5Ff206E5a7D64ef37128fAB";
+      
+      // Kiểm tra: không cho phép gửi từ ví admin đến chính nó
+      if (account && account.toLowerCase() === receiver.toLowerCase()) {
+        throw new Error('Không thể mua hàng bằng ví admin. Vui lòng dùng ví khác để mua hàng.');
+      }
+      
       const amountEth = ethAmount ?? Number((totalPrice * 0.0003).toFixed(6));
       const valueWei = ethers.parseEther(amountEth.toFixed(6));
 

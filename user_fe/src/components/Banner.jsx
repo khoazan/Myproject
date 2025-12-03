@@ -1,5 +1,5 @@
 // src/components/Banner.jsx - Carousel Banner với auto-play
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 
 // ============================================
 // 📸 CHỖ NÀY ĐỂ BẠN TỰ THAY ẢNH VÀO
@@ -13,30 +13,30 @@ import React, { useState, useEffect } from 'react';
 const banners = [
   {
     id: 1,
-    image: '/images/banners/momo.png', // 👈 THAY ẢNH Ở ĐÂY - File đang ở public/momo.png
-    title: 'Deal Chồng Deal',
-    subtitle: 'Giảm thêm đến 30K khi thanh toán bằng MoMo',
-    buttonText: 'Mua ngay',
-    buttonLink: '#',
-    bgColor: 'from-pink-500 to-pink-600', // Màu nền nếu không có ảnh
+    image: "/images/banners/momo.png", // 👈 THAY ẢNH Ở ĐÂY - File đang ở public/momo.png
+    title: "Deal Chồng Deal",
+    subtitle: "Giảm thêm đến 30K khi thanh toán bằng MoMo",
+    buttonText: "Mua ngay",
+    buttonLink: "#",
+    bgColor: "from-pink-500 to-pink-600", // Màu nền nếu không có ảnh
   },
   {
     id: 2,
-    image: '/images/banners/banner2.jpg', // 👈 THAY ẢNH Ở ĐÂY
-    title: 'Giao nhanh 2h',
-    subtitle: 'Miễn phí vận chuyển cho đơn hàng từ 200K',
-    buttonText: 'Đổi quà ngay',
-    buttonLink: '#',
-    bgColor: 'from-blue-500 to-blue-600',
+    image: "/images/banners/thuoc.webp", // 👈 THAY ẢNH Ở ĐÂY
+    title: "Giao nhanh 2h",
+    subtitle: "Miễn phí vận chuyển cho đơn hàng từ 200K",
+    buttonText: "Đổi quà ngay",
+    buttonLink: "#",
+    bgColor: "from-blue-500 to-blue-600",
   },
   {
     id: 3,
-    image: '/images/banners/banner3.jpg', // 👈 THAY ẢNH Ở ĐÂY
-    title: 'Hướng dẫn tra cứu thông tin thuốc',
-    subtitle: 'Tìm hiểu cách tra cứu thông tin thuốc đúng cách',
-    buttonText: 'Xem ngay',
-    buttonLink: '#',
-    bgColor: 'from-indigo-500 to-indigo-600',
+    image: "/images/banners/ebe.avif", // 👈 THAY ẢNH Ở ĐÂY
+    title: "Hướng dẫn tra cứu thông tin thuốc",
+    subtitle: "Tìm hiểu cách tra cứu thông tin thuốc đúng cách",
+    buttonText: "Xem ngay",
+    buttonLink: "#",
+    bgColor: "from-indigo-500 to-indigo-600",
   },
   // 👇 BẠN CÓ THỂ THÊM NHIỀU BANNER NỮA Ở ĐÂY
   // {
@@ -67,7 +67,7 @@ const Banner = () => {
 
   // Chuyển slide trước
   const goToPrevious = () => {
-    setCurrentIndex((prevIndex) => 
+    setCurrentIndex((prevIndex) =>
       prevIndex === 0 ? banners.length - 1 : prevIndex - 1
     );
     setIsAutoPlaying(false); // Tạm dừng auto-play khi user click
@@ -93,7 +93,7 @@ const Banner = () => {
   const handleMouseLeave = () => setIsAutoPlaying(true);
 
   return (
-    <section 
+    <section
       className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -104,12 +104,12 @@ const Banner = () => {
           <div
             key={banner.id}
             className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-              index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
+              index === currentIndex ? "opacity-100 z-10" : "opacity-0 z-0"
             }`}
           >
             {/* Background Image hoặc Gradient */}
             {banner.image ? (
-              <div 
+              <div
                 className="w-full h-full bg-cover bg-center bg-no-repeat"
                 style={{
                   backgroundImage: `url(${banner.image})`,
@@ -118,10 +118,14 @@ const Banner = () => {
                 {/* Overlay để text dễ đọc hơn */}
                 <div className="absolute inset-0 bg-black/20"></div>
                 {/* Fallback nếu ảnh không load được */}
-                <div className={`absolute inset-0 bg-gradient-to-r ${banner.bgColor} opacity-0 hover:opacity-100 transition-opacity`}></div>
+                <div
+                  className={`absolute inset-0 bg-gradient-to-r ${banner.bgColor} opacity-0 hover:opacity-100 transition-opacity`}
+                ></div>
               </div>
             ) : (
-              <div className={`w-full h-full bg-gradient-to-r ${banner.bgColor}`}></div>
+              <div
+                className={`w-full h-full bg-gradient-to-r ${banner.bgColor}`}
+              ></div>
             )}
 
             {/* Content của banner */}
@@ -203,8 +207,8 @@ const Banner = () => {
               onClick={() => goToSlide(index)}
               className={`transition-all duration-300 rounded-full ${
                 index === currentIndex
-                  ? 'w-8 h-3 bg-white'
-                  : 'w-3 h-3 bg-white/50 hover:bg-white/75'
+                  ? "w-8 h-3 bg-white"
+                  : "w-3 h-3 bg-white/50 hover:bg-white/75"
               }`}
               aria-label={`Go to slide ${index + 1}`}
             />

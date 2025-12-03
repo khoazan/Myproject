@@ -16,9 +16,7 @@ const ProductSection = () => {
           throw new Error("Failed to fetch drugs from backend");
         }
         const data = await res.json();
-        const formatted = data
-          .filter((item) => item.stage !== 4)
-          .map((item) => {
+        const formatted = data.map((item) => {
             const description = `Batch: ${item.batch} | Owner: ${item.owner.slice(
               0,
               6
@@ -59,12 +57,24 @@ const ProductSection = () => {
   };
 
   const handleBuy = async (product) => {
+    if (product.stage === 4) {
+      alert("Sản phẩm này đã Sold out, không thể mua nữa.");
+      return;
+    }
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
+      const currentAccount = await signer.getAddress();
+      const receiver = "0xaBeDEfE118d9016Ba5Ff206E5a7D64ef37128fAB"; // ví admin
+      
+      // Kiểm tra: không cho phép gửi từ ví admin đến chính nó
+      if (currentAccount.toLowerCase() === receiver.toLowerCase()) {
+        alert("Không thể mua hàng bằng ví admin. Vui lòng dùng ví khác để mua hàng.");
+        return;
+      }
 
       const tx = await signer.sendTransaction({
-        to: "0xaBeDEfE118d9016Ba5Ff206E5a7D64ef37128fAB", // ví admin
+        to: receiver,
         value: ethers.parseEther(product.price.toString()),
       });
 
@@ -120,9 +130,16 @@ const ProductSection = () => {
                 <ProductCard product={product} />
                 <button
                   onClick={() => handleBuy(product)}
-                  className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg"
+                  disabled={product.stage === 4}
+                  className={`mt-2 w-full py-2 rounded-lg ${
+                    product.stage === 4
+                      ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }`}
                 >
-                  Mua ngay ({product.price} ETH)
+                  {product.stage === 4
+                    ? "Sold out"
+                    : `Mua ngay (${product.price} ETH)`}
                 </button>
               </div>
             ))}

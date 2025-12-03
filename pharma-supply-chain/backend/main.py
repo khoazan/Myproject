@@ -9,9 +9,12 @@ import re
 import uvicorn
 import random
 import jwt
-from fastapi import FastAPI, HTTPException, Depends, status
+import shutil
+import time
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from web3 import Web3
@@ -85,9 +88,42 @@ if PRIVATE_KEY:
     print(f"🔐 Backend signer account: {account.address}")
 
 # -----------------------------------------------------------------------------------
+# IMAGE UPLOAD SETUP
+# -----------------------------------------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+IMAGE_DB_PATH = UPLOAD_DIR / "drug_images.json"
+
+# Tạo file drug_images.json nếu chưa có
+if not IMAGE_DB_PATH.exists():
+    IMAGE_DB_PATH.write_text("{}", encoding="utf-8")
+
+def load_image_map() -> Dict[str, str]:
+    """Load mapping drug_id -> image_path từ JSON file."""
+    try:
+        if IMAGE_DB_PATH.exists():
+            with open(IMAGE_DB_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"⚠️ Error loading image map: {e}")
+    return {}
+
+def save_image_map(data: Dict[str, str]) -> None:
+    """Lưu mapping drug_id -> image_path vào JSON file."""
+    try:
+        with open(IMAGE_DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"⚠️ Error saving image map: {e}")
+
+# -----------------------------------------------------------------------------------
 # FASTAPI SETUP + CORS
 # -----------------------------------------------------------------------------------
 app = FastAPI(title="Pharma SupplyChain Backend")
+
+# Mount static files để serve ảnh (phải đặt sau khi tạo app)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -271,10 +307,11 @@ def health():
 def build_drug_payload(include_cancelled: bool = False) -> List[Dict[str, Any]]:
     """
     Lấy danh sách thuốc từ smart contract.
-    Trả về: id, name, batch, owner, price (wei), stage.
+    Trả về: id, name, batch, owner, price (wei), stage, image.
     """
     result = contract.functions.getAllDrugs().call()
     ids, names, batches, prices, stages, owners = result
+    image_map = load_image_map()
 
     payload: List[Dict[str, Any]] = []
     for i in range(len(ids)):
@@ -283,14 +320,16 @@ def build_drug_payload(include_cancelled: bool = False) -> List[Dict[str, Any]]:
             # 4 = Cancelled (theo design cũ)
             continue
 
+        drug_id = int(ids[i])
         payload.append(
             {
-                "id": int(ids[i]),
+                "id": drug_id,
                 "name": names[i],
                 "batch": batches[i],
                 "owner": owners[i],
                 "price": int(prices[i]),
                 "stage": stage,
+                "image": image_map.get(str(drug_id)),  # Thêm image path
             }
         )
     return payload
@@ -334,6 +373,65 @@ def add_drug(payload: AddDrugPayload, current_user: dict = Depends(get_current_u
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.post("/drugs/{drug_id}/image")
+async def upload_drug_image(
+    drug_id: int,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Upload ảnh cho thuốc (drug_id).
+    Lưu file vào thư mục uploads/ và cập nhật mapping trong drug_images.json.
+    """
+    try:
+        # Kiểm tra file là ảnh
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="File phải là ảnh")
+
+        # Tạo tên file: drug_{drug_id}_{timestamp}.{ext}
+        ext = file.filename.split(".")[-1] if "." in file.filename else "png"
+        timestamp = int(time.time())
+        filename = f"drug_{drug_id}_{timestamp}.{ext}"
+        file_path = UPLOAD_DIR / filename
+
+        # Lưu file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Cập nhật mapping
+        image_map = load_image_map()
+        image_map[str(drug_id)] = f"/uploads/{filename}"
+        save_image_map(image_map)
+
+        return {"message": "✅ Upload ảnh thành công", "image_path": f"/uploads/{filename}"}
+    except Exception as e:
+        print(f"❌ Error uploading image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/drugs/{drug_id}/soldout")
+def mark_sold_out(drug_id: int, current_user: dict = Depends(get_current_user)):
+    """
+    Đánh dấu thuốc Sold out/Cancelled trên blockchain.
+    Thực hiện bằng tài khoản backend (admin) nên không cần MetaMask phía client.
+    """
+    try:
+        nonce = w3.eth.get_transaction_count(account.address, "pending")
+        tx = contract.functions.removeDrug(drug_id).build_transaction(
+            {
+                "from": account.address,
+                "nonce": nonce,
+                "gas": 300000,
+                "gasPrice": int(w3.eth.gas_price * 1.1),
+                "chainId": CHAIN_ID,
+            }
+        )
+        tx_hash = send_signed_tx(tx)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+        return {"tx": tx_hash, "status": "confirmed", "blockNumber": receipt.blockNumber}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/drugs/transfer")

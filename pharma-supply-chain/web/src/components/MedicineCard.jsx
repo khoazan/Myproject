@@ -2,7 +2,8 @@ import React from "react";
 import { Link } from "react-router-dom";
 
 export default function MedicineCard({ m, onNextStage, showNextStage = true, onEdit, onDelete }) {
-  const stages = ["Manufactured", "Distributed", "InPharmacy", "Sold", "Cancelled"];
+  // Đổi label stage cuối thành "Sold out" cho dễ hiểu với admin
+  const stages = ["Manufactured", "Distributed", "InPharmacy", "Sold", "Sold out"];
 
   const stageColors = [
     "bg-blue-100 text-blue-700",
@@ -24,18 +25,34 @@ export default function MedicineCard({ m, onNextStage, showNextStage = true, onE
   };
   const fallbackImg = "https://placehold.co/400x250?text=No+Image";
 
+  const isSoldOut = m.stage === 4;
+
   return (
-    <div className="rounded-2xl bg-white shadow-lg p-5 hover:shadow-2xl hover:scale-[1.02] transition-all duration-200 ease-out flex flex-col justify-between min-h-[300px]">
+    <div
+      className={`rounded-2xl bg-white shadow-lg p-5 transition-all duration-200 ease-out flex flex-col justify-between min-h-[300px] ${
+        isSoldOut ? "opacity-75 cursor-not-allowed" : "hover:shadow-2xl hover:scale-[1.02] cursor-pointer"
+      }`}
+      onClick={() => {
+        if (!isSoldOut && onEdit) onEdit(m);
+      }}
+    >
       {/* 🖼️ Ảnh thuốc (fallback nếu không có) */}
-      <img
-        src={getImageSrc()}
-        alt={m.name}
-        className="w-full h-40 object-cover rounded-xl mb-3"
-        onError={(e) => {
-          e.currentTarget.src = fallbackImg;
-          e.currentTarget.onerror = null;
-        }}
-      />
+      <div className="relative mb-3">
+        <img
+          src={getImageSrc()}
+          alt={m.name}
+          className="w-full h-40 object-cover rounded-xl"
+          onError={(e) => {
+            e.currentTarget.src = fallbackImg;
+            e.currentTarget.onerror = null;
+          }}
+        />
+        {isSoldOut && (
+          <span className="absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold bg-red-500 text-white">
+            Sold out
+          </span>
+        )}
+      </div>
 
       <div className="flex justify-between items-start gap-4">
         <div className="min-w-0">
@@ -64,20 +81,28 @@ export default function MedicineCard({ m, onNextStage, showNextStage = true, onE
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-400">ID: {m.id}</span>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onEdit && onEdit(m)}
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-lg transition"
-          >
-            Sửa thuốc
-          </button>
-          <button
-            onClick={() => onDelete && onDelete(m)}
-            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm rounded-lg transition"
-          >
-            Xóa thuốc
-          </button>
-        </div>
+        {!isSoldOut && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit && onEdit(m);
+              }}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded-lg transition"
+            >
+              Sửa thuốc
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete && onDelete(m);
+              }}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm rounded-lg transition"
+            >
+              Sold out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

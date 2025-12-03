@@ -223,22 +223,30 @@ export default function Product() {
   }
 
   async function handleDelete(m) {
-    if (!confirm(`Xóa thuốc "${m.name}"? (Sẽ chuyển sang trạng thái Cancelled)`)) return;
+    if (!confirm(`Đánh dấu thuốc "${m.name}" là Sold out? (User sẽ không mua được nữa)`)) return;
     try {
-      const provider = await connectWallet();
-      const signer = provider.getSigner();
-      const contract = getContract(signer);
-      
-      const tx = await contract.removeDrug(m.id);
-      alert("⏳ Đang gửi giao dịch lên blockchain...");
-      await tx.wait();
-      alert("✅ Đã xóa thuốc (chuyển sang Cancelled)!");
-      
-      // Remove from UI
-      setMedicines((prev) => prev.filter((x) => x.id !== m.id));
-      
-      // Also try backend if available
-      await tryDeleteBackend(m.id);
+      const token = localStorage.getItem(AUTH_TOKEN_KEY);
+      if (!token) {
+        alert("Vui lòng đăng nhập lại để thao tác.");
+        return;
+      }
+
+      const res = await fetch(`${BACKEND_BASE_URL}/drugs/${m.id}/soldout`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Không thể đánh dấu Sold out");
+      }
+
+      alert("✅ Đã đánh dấu Sold out cho thuốc này!");
+
+      // Cập nhật UI: stage = 4
+      setMedicines((prev) => prev.map((x) => (x.id === m.id ? { ...x, stage: 4 } : x)));
     } catch (err) {
       console.error(err);
       alert("❌ Lỗi khi xóa thuốc: " + (err.message || err));
@@ -385,6 +393,13 @@ export default function Product() {
                     className="px-4 py-2 rounded bg-slate-200"
                   >
                     Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete({ id: editTarget.id, name: editTarget.name })}
+                    className="px-4 py-2 rounded bg-rose-600 text-white"
+                  >
+                    Đánh dấu Sold out
                   </button>
                   <button
                     type="submit"

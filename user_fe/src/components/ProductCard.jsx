@@ -8,6 +8,8 @@ const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
   const [isAdded, setIsAdded] = useState(false);
 
+  const isSoldOut = product.stage === 4;
+
   const handleAddToCart = () => {
     addToCart(product);
     setIsAdded(true);
@@ -21,6 +23,11 @@ const ProductCard = ({ product }) => {
       {/* Product Image - Clickable */}
       <Link to={`/product/${product.id}`} className="block">
         <div className="relative h-48 bg-gradient-to-br from-blue-50 to-blue-100 overflow-hidden cursor-pointer">
+          {isSoldOut && (
+            <span className="absolute top-2 right-2 z-10 px-2 py-1 rounded-full text-xs font-semibold bg-red-500 text-white">
+              Sold out
+            </span>
+          )}
           {product.imageUrl ? (
             <img
               src={product.imageUrl}
